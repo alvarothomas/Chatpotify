@@ -2,6 +2,10 @@
 
 Chatpotify is a chatbot that creates theme-based playlists on Spotify using OpenAI. Users can interact with the chatbot to specify a theme by giving the name of the playlist, and Chatpotify will create a playlist and optionally display the tracks included.
 
+## Work in Progress
+
+This project is currently a work in progress. Contributions and feedback are welcome!
+
 ## Features
 
 - Creates playlists based on user-specified themes.
