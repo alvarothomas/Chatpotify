@@ -1,11 +1,15 @@
 import openai
 import spotipy
 from spotify_auth import sp
-from openai import OpenAI
 import config
+import time
 
-# Set up OpenAI API key and OpenAI client
-client = OpenAI(api_key=config.OPENAI_API_KEY)
+# Set up OpenAI API key
+from openai import OpenAI, OpenAIError
+
+client = OpenAI(
+  api_key=config.OPENAI_API_KEY,
+)
 
 def search_playlists(theme):
     results = sp.search(q=theme, limit=10, type='playlist')
@@ -41,11 +45,21 @@ def display_tracks(tracks, start=0, count=10):
         print(f"{i}. '{track_name}' by '{artist_name}'")
 
 def generate_chatgpt_response(prompt):
-    response = client.chat.completions.create(
-        model='gpt-3.5-turbo',
-        messages=[{"role": "user", "content": prompt}]
-    )
-    return response.choices[0].message['content'].strip()
+    retries = 3
+    for i in range(retries):
+        try:
+            response = client.chat.completions.create(
+                model='gpt-3.5-turbo',
+                messages=[{"role": "user", "content": prompt}]
+            )
+            return response.choices[0].message.content.strip()
+        except OpenAIError as e:  # Use the correct error class
+            if isinstance(e, OpenAIError) and i < retries - 1:  # i is zero indexed
+                print(f"Rate limit exceeded, retrying in {2 ** i} seconds...")
+                time.sleep(2 ** i)
+            else:
+                print(f"An error occurred: {str(e)}")
+                raise
 
 def chat():
     print("Chatpotify: Hello! I can help you create theme-based playlists on Spotify. What theme would you like?")
@@ -59,8 +73,15 @@ def chat():
 
         theme = user_input
         prompt = f"The user wants to create a playlist with the theme '{theme}'. What are some popular songs and artists that fit this theme?"
-        chatgpt_response = generate_chatgpt_response(prompt)
-        print(f"Chatpotify: {chatgpt_response}")
+        try:
+            chatgpt_response = generate_chatgpt_response(prompt)
+            print(f"Chatpotify: {chatgpt_response}")
+        except OpenAIError as e:
+            if isinstance(e, OpenAIError):
+                print("Unable to generate a response from OpenAI due to rate limit. Please try again later.")
+            else:
+                print(f"An error occurred: {str(e)}")
+            continue
 
         playlist_id = create_playlist(theme, user_id)
         print(f"Chatpotify: Created a playlist named '{theme} Playlist'. Adding some tracks...")
