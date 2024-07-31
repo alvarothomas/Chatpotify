@@ -1,34 +1,18 @@
-# chatpotify.py
-
+import openai
 import spotipy
-from spotipy.oauth2 import SpotifyOAuth
 from spotify_auth import sp
+from openai import OpenAI
 import config
 
+# Set up OpenAI API key and OpenAI client
+client = OpenAI(api_key=config.OPENAI_API_KEY)
+
 def search_playlists(theme):
-    """
-    Searches for Spotify playlists based on the given theme.
-
-    Parameters:
-    theme (str): The theme to search for playlists.
-
-    Returns:
-    list: A list of playlist IDs matching the theme.
-    """
     results = sp.search(q=theme, limit=10, type='playlist')
     playlists = results['playlists']['items']
     return [playlist['id'] for playlist in playlists]
 
 def get_playlist_tracks(playlist_id):
-    """
-    Retrieves all track IDs from a given playlist.
-
-    Parameters:
-    playlist_id (str): The ID of the Spotify playlist.
-
-    Returns:
-    list: A list of track objects from the playlist.
-    """
     tracks = []
     results = sp.playlist_tracks(playlist_id)
     tracks.extend(results['items'])
@@ -40,53 +24,32 @@ def get_playlist_tracks(playlist_id):
     return tracks
 
 def create_playlist(theme, user_id):
-    """
-    Creates a new playlist on Spotify with the given theme.
-
-    Parameters:
-    theme (str): The theme for the playlist.
-    user_id (str): The Spotify user ID.
-
-    Returns:
-    str: The ID of the created playlist.
-    """
     playlist_name = f"{theme} Playlist"
     playlist = sp.user_playlist_create(user=user_id, name=playlist_name, public=True)
     return playlist['id']
 
 def add_tracks_to_playlist(playlist_id, tracks):
-    """
-    Adds tracks to the specified Spotify playlist in batches.
-
-    Parameters:
-    playlist_id (str): The ID of the Spotify playlist.
-    tracks (list): A list of Spotify track objects to add to the playlist.
-    """
     batch_size = 100
     for i in range(0, len(tracks), batch_size):
         sp.playlist_add_items(playlist_id, [track['track']['id'] for track in tracks[i:i+batch_size]])
 
 def display_tracks(tracks, start=0, count=10):
-    """
-    Displays the song names and artists in the format "songname" by "artist", with pagination.
-
-    Parameters:
-    tracks (list): A list of track objects.
-    start (int): The starting index of tracks to display.
-    count (int): The number of tracks to display.
-    """
     end = start + count
     for i, track in enumerate(tracks[start:end], start=start + 1):
         track_name = track['track']['name']
         artist_name = track['track']['artists'][0]['name']
         print(f"{i}. '{track_name}' by '{artist_name}'")
 
+def generate_chatgpt_response(prompt):
+    response = client.chat.completions.create(
+        model='gpt-3.5-turbo',
+        messages=[{"role": "user", "content": prompt}]
+    )
+    return response.choices[0].message['content'].strip()
+
 def chat():
-    """
-    Main function to handle the chat interaction with the user.
-    """
-    print("Chatpotify: Hello! I can help you create theme-based playlists on Spotify after the name of your playlist. For example: 'Summer vibes'. What theme would you like?")
-    user_id = sp.me()['id']  # Get the authenticated user's Spotify ID
+    print("Chatpotify: Hello! I can help you create theme-based playlists on Spotify. What theme would you like?")
+    user_id = sp.current_user()['id']  # Get the authenticated user's Spotify ID
 
     while True:
         user_input = input("You: ")
@@ -95,6 +58,10 @@ def chat():
             break
 
         theme = user_input
+        prompt = f"The user wants to create a playlist with the theme '{theme}'. What are some popular songs and artists that fit this theme?"
+        chatgpt_response = generate_chatgpt_response(prompt)
+        print(f"Chatpotify: {chatgpt_response}")
+
         playlist_id = create_playlist(theme, user_id)
         print(f"Chatpotify: Created a playlist named '{theme} Playlist'. Adding some tracks...")
 
