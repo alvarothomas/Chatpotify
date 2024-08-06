@@ -1,14 +1,13 @@
 import openai
+from openai import OpenAI
 import spotipy
 from spotify_auth import sp
 import config
 import time
 
 # Set up OpenAI API key
-from openai import OpenAI, OpenAIError
-
 client = OpenAI(
-  api_key=config.OPENAI_API_KEY,
+    api_key=config.OPENAI_API_KEY,
 )
 
 def search_playlists(theme):
@@ -53,13 +52,17 @@ def generate_chatgpt_response(prompt):
                 messages=[{"role": "user", "content": prompt}]
             )
             return response.choices[0].message.content.strip()
-        except OpenAIError as e:  # Use the correct error class
-            if isinstance(e, OpenAIError) and i < retries - 1:  # i is zero indexed
+        except openai.RateLimitError as e:  # Use the correct error class
+            if i < retries - 1:  # i is zero indexed
                 print(f"Rate limit exceeded, retrying in {2 ** i} seconds...")
                 time.sleep(2 ** i)
             else:
                 print(f"An error occurred: {str(e)}")
                 raise
+        except openai.APIStatusError as e:
+            print("Another non-200-range status code was received")
+            print(e.status_code)
+            print(e.response)
 
 def chat():
     print("Chatpotify: Hello! I can help you create theme-based playlists on Spotify. What theme would you like?")
@@ -76,11 +79,11 @@ def chat():
         try:
             chatgpt_response = generate_chatgpt_response(prompt)
             print(f"Chatpotify: {chatgpt_response}")
-        except OpenAIError as e:
-            if isinstance(e, OpenAIError):
-                print("Unable to generate a response from OpenAI due to rate limit. Please try again later.")
-            else:
-                print(f"An error occurred: {str(e)}")
+        except openai.RateLimitError:
+            print("Unable to generate a response from OpenAI due to rate limit. Please try again later.")
+            continue
+        except openai.APIStatusError as e:
+            print(f"An error occurred: {str(e)}")
             continue
 
         playlist_id = create_playlist(theme, user_id)
