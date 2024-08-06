@@ -52,17 +52,23 @@ def generate_chatgpt_response(prompt):
                 messages=[{"role": "user", "content": prompt}]
             )
             return response.choices[0].message.content.strip()
-        except openai.RateLimitError as e:  # Use the correct error class
-            if i < retries - 1:  # i is zero indexed
+        except openai.RateLimitError as e:
+            if i < retries - 1:
                 print(f"Rate limit exceeded, retrying in {2 ** i} seconds...")
                 time.sleep(2 ** i)
             else:
-                print(f"An error occurred: {str(e)}")
+                print(f"Rate limit exceeded: {str(e)}. Please check your API usage and upgrade your plan if necessary.")
                 raise
         except openai.APIStatusError as e:
-            print("Another non-200-range status code was received")
-            print(e.status_code)
-            print(e.response)
+            print(f"Another non-200-range status code was received: {e.status_code}")
+            print(f"Response: {e.response}")
+            raise
+        except openai.APIConnectionError as e:
+            print(f"Failed to connect to the OpenAI API: {str(e)}")
+            raise
+        except openai.APIError as e:
+            print(f"An unexpected OpenAI API error occurred: {str(e)}")
+            raise
 
 def chat():
     print("Chatpotify: Hello! I can help you create theme-based playlists on Spotify. What theme would you like?")
@@ -84,6 +90,12 @@ def chat():
             continue
         except openai.APIStatusError as e:
             print(f"An error occurred: {str(e)}")
+            continue
+        except openai.APIConnectionError as e:
+            print(f"Failed to connect to the OpenAI API: {str(e)}")
+            continue
+        except openai.APIError as e:
+            print(f"An unexpected OpenAI API error occurred: {str(e)}")
             continue
 
         playlist_id = create_playlist(theme, user_id)
